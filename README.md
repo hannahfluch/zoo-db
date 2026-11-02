@@ -2,6 +2,9 @@
 
 A PostgreSQL 17 relational model with four tables and English names.
 
+The [Python benchmark client](client/README.md) generates related fake data,
+inserts configurable row counts, and reports insert and query timings.
+
 | Table | Fields | Purpose |
 | --- | --- | --- |
 | `animals` | 5 | Animal details, enclosure, and one optional recorded parent |
