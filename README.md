@@ -49,7 +49,7 @@ The database enforces these constraints:
 Longer ancestry cycles, biological parentage rules, and cross-table date checks
 (such as a checkup occurring after birth) are outside this small model.
 
-Requires Docker with Docker Compose. Start the database from this directory:
+Requires Docker with Docker Compose. Start PostgreSQL and MongoDB from this directory:
 
 ```sh
 docker compose up -d --build --wait
@@ -58,6 +58,29 @@ docker compose up -d --build --wait
 The database is available at `localhost:5432`, database/user `zoo`, password
 `zoo_local_password`. These are local development credentials. Optionally set
 `POSTGRES_PASSWORD` and `POSTGRES_PORT` in a local `.env` before the first start.
+
+MongoDB 8.0 is available at `localhost:27017`, with user `zoo`, password
+`zoo_mongo_local_password`, and authentication database `admin`. Its connection URI is:
+
+```text
+mongodb://zoo:zoo_mongo_local_password@localhost:27017/zoo?authSource=admin
+```
+
+Optionally set `MONGO_PASSWORD` and `MONGO_PORT` in `.env` before the first start.
+Both database ports bind only to localhost. MongoDB stores data in its own named
+volume, `zoo_mongo_data`. Credentials are initialized only on an empty volume;
+changing `.env` later does not change existing users' passwords. This follows the
+[official MongoDB image](https://hub.docker.com/_/mongo) configuration.
+
+Open an authenticated MongoDB shell (uses the configured password):
+
+```sh
+docker compose exec mongo sh -c 'exec mongosh zoo --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin'
+```
+
+MongoDB starts empty; collections and seed data are not created yet. The `zoo`
+database is created when data is first written. This service runs as a standalone
+server; multi-document transactions would require a replica set configuration.
 
 Open an SQL shell or run all seven example queries:
 
@@ -72,15 +95,16 @@ schema. Both scripts run automatically, in filename order, on the first start.
 Initialization scripts only run when the data directory is empty, as documented
 by the [official PostgreSQL image](https://hub.docker.com/_/postgres).
 
-Stop the database while preserving data:
+Stop both databases while preserving data:
 
 ```sh
 docker compose down
 ```
 
 To recreate the schema and sample data after editing the initialization scripts,
-run the reset script. It rebuilds the image, removes the database volume, and
-starts a fresh database. **This deletes all stored zoo data:**
+run the reset script. It rebuilds the PostgreSQL image, removes both database
+volumes, and starts both services again. PostgreSQL receives its schema and sample
+data; MongoDB starts empty. **This deletes all PostgreSQL and MongoDB zoo data:**
 
 ```sh
 ./reset-db.sh

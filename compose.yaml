@@ -16,5 +16,30 @@ services:
       retries: 10
       start_period: 10s
 
+  mongo:
+    image: mongo:8.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: zoo
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-zoo_mongo_local_password}
+      MONGO_INITDB_DATABASE: zoo
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
+    volumes:
+      - zoo_mongo_data:/data/db
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet --host 127.0.0.1
+          --username "$$MONGO_INITDB_ROOT_USERNAME"
+          --password "$$MONGO_INITDB_ROOT_PASSWORD"
+          --authenticationDatabase admin
+          --eval 'if (db.adminCommand({ping: 1}).ok !== 1) quit(1)'
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
 volumes:
   zoo_data:
+  zoo_mongo_data:

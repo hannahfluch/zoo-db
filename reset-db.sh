@@ -5,9 +5,9 @@ set -eu
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$project_dir"
 
-printf '%s\n' 'Resetting the zoo database: all stored data will be deleted.'
+printf '%s\n' 'Resetting PostgreSQL and MongoDB: all stored data in both databases will be deleted.'
 docker compose config --quiet
 docker compose build db
 docker compose down --volumes
-docker compose up -d --wait db
-printf '%s\n' 'Zoo database recreated with the current schema and sample data.'
+docker compose up -d --wait
+printf '%s\n' 'PostgreSQL recreated with the current schema and sample data; MongoDB started empty.'
