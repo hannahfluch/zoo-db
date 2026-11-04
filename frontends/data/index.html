@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Zoo data</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <nav id="navigation" aria-label="Data"></nav>
+    <label class="database-label">Database <select id="database"><option value="postgres">PostgreSQL</option><option value="mongo">MongoDB</option></select></label>
+  </header>
+  <main id="main" tabindex="-1"></main>
+  <dialog id="create-dialog" aria-labelledby="dialog-title"></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

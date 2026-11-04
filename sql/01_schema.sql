@@ -24,13 +24,13 @@ CREATE TABLE animals (
     name VARCHAR(80) NOT NULL,
     birth_date DATE NOT NULL,
     enclosure_id INTEGER NOT NULL REFERENCES enclosures (enclosure_id) ON DELETE RESTRICT,
-    parent_id INTEGER REFERENCES animals (animal_id) ON DELETE RESTRICT,
+    parent_id INTEGER REFERENCES animals (animal_id) ON DELETE SET NULL,
     CONSTRAINT animal_not_own_parent CHECK (parent_id <> animal_id)
 );
 
 CREATE TABLE checkups (
     checkup_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    animal_id INTEGER NOT NULL REFERENCES animals (animal_id) ON DELETE RESTRICT,
+    animal_id INTEGER NOT NULL REFERENCES animals (animal_id) ON DELETE CASCADE,
     employee_id INTEGER NOT NULL REFERENCES employees (employee_id) ON DELETE RESTRICT,
     checked_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     notes TEXT NOT NULL CHECK (btrim(notes) <> '')

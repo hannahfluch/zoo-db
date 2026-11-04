@@ -17,7 +17,7 @@ services:
       start_period: 10s
 
   mongo:
-    image: mongo:8.0
+    build: ./mongo
     environment:
       MONGO_INITDB_ROOT_USERNAME: zoo
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-zoo_mongo_local_password}
@@ -26,6 +26,7 @@ services:
       - "127.0.0.1:${MONGO_PORT:-27017}:27017"
     volumes:
       - zoo_mongo_data:/data/db
+      - zoo_mongo_config:/data/configdb
     healthcheck:
       test:
         - CMD-SHELL
@@ -40,6 +41,43 @@ services:
       retries: 10
       start_period: 20s
 
+  backend:
+    build: ./backend
+    environment:
+      PGHOST: db
+      PGDATABASE: zoo
+      PGUSER: zoo
+      PGPASSWORD: ${POSTGRES_PASSWORD:-zoo_local_password}
+      MONGO_URL: mongodb://mongo:27017/zoo?directConnection=true
+      MONGO_PASSWORD: ${MONGO_PASSWORD:-zoo_mongo_local_password}
+    depends_on:
+      db:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${API_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "const r = await fetch('http://localhost:3000/api/health'); process.exit(r.ok ? 0 : 1)"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+
+  data:
+    build: ./frontends/data
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${DATA_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   zoo_data:
   zoo_mongo_data:
+  zoo_mongo_config:

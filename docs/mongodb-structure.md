@@ -1,12 +1,17 @@
 # MongoDB document structure
 
-This document specifies the planned MongoDB persistence variant. It is a design;
-the repository does not yet implement MongoDB persistence or scalable seeding.
+This document specifies the MongoDB persistence variant implemented in
+`backend/src/mongo.ts`. The backend supports reads, creation, editing, and deletion, including atomic
+embedded updates. Scalable benchmark seeding remains future work.
 
 Keep the four collections `enclosures`, `employees`, `animals`, and `checkups`.
 Each holds the authoritative records for its entity. Embed related summaries to
 let the frontend render detail pages without joining collections. Embedded IDs
 identify the source records; the other embedded fields are duplicated data.
+
+Only MongoDB's required `_id` index and unique indexes on enclosure `name` and
+employee `email` are used. The backend does not create extra relationship,
+sorting, or search indexes.
 
 The examples use string IDs and ISO date strings as a JSON file format. An
 implementation must use the same ID representation throughout and convert
@@ -141,12 +146,19 @@ Embedded values represent current data, not historical snapshots.
   arrays. Renaming an enclosure updates enclosure summaries in its animals.
 - Changes to other duplicated fields, such as animal birth dates, propagate to
   every embedded copy of that field.
-- Preserve the relational model's deletion restrictions: reject deleting an
-  enclosure with animals, an animal with offspring or checkups, or an employee
-  with checkups. Deleting an otherwise eligible animal removes its enclosure entry.
+- Deleting an animal removes all of its checkups from the authoritative collection,
+  removes its enclosure entry, and sets `parent` to null in its offspring. The
+  offspring and their own checkups remain. Rebuild each affected employee's recent
+  history from the remaining checkups, including older entries that fill gaps.
+  Determine affected employees from the complete checkup collection, not just the
+  animal's latest 100 embedded entries. Commit all changes in one transaction.
+- Reject deleting an occupied enclosure or an employee with checkups.
 
-The persistence implementation must coordinate these multi-document changes,
-using transactions when atomic consistency is required. Enforce required fields,
+The backend coordinates creates, edits, and deletes with MongoDB transactions on
+the single-node replica set configured by Compose. Related documents are touched
+with an internal `_revision` counter to make concurrent relationship writes and
+deletions conflict and retry, preserving valid references and current summaries.
+This internal counter is omitted from API responses. Enforce required fields,
 allowed habitat types, positive areas, nonempty notes, and unique enclosure names
 and employee emails as in the relational variant. Relationship validity must
 also be checked by the persistence layer.
