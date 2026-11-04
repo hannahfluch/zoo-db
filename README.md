@@ -2,6 +2,10 @@
 
 A PostgreSQL 17 relational model with four tables and English names.
 
+The planned second persistence variant is documented in
+[MongoDB document structure](docs/mongodb-structure.md), including four collections,
+embedded frontend views, and rules for keeping duplicated data consistent.
+
 | Table | Fields | Purpose |
 | --- | --- | --- |
 | `animals` | 5 | Animal details, enclosure, and one optional recorded parent |
