@@ -28,7 +28,7 @@ statistics are refreshed after insertion.
 ## Queries
 
 The frontend displays seven paired SQL and MongoDB presets from
-`backend/src/benchmark-catalog.ts`, each with a run button for either or both
+`backend/src/benchmark-queries.ts`, each with a run button for either or both
 databases. They operate on checkups:
 
 | Operation | Equivalent behavior |

@@ -2,14 +2,14 @@ import { randomUUID } from "node:crypto";
 import { unlink } from "node:fs/promises";
 import { z } from "zod";
 import { HttpError, entities } from "./model";
-import { benchmarkQueries, databases, type Database, type QueryId, type Target } from "./benchmark-catalog";
+import { benchmarkQueries, databases, QueryId, type Database, type Target } from "./benchmark-queries";
 import { batchIds, generateBatch, insertMongo, insertPostgres } from "./benchmark-data";
 import { runQuery, type BenchmarkStores } from "./benchmark-queries";
 import { runInsertBenchmark } from "./benchmark-inserts";
 import { runCustomQuery } from "./custom-queries";
 
 const targetSchema = z.enum(["postgres", "mongo", "both"]);
-const querySchema = z.enum(benchmarkQueries.map(q => q.id) as [QueryId, ...QueryId[]]);
+const querySchema = z.enum(QueryId);
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reset"), confirm: z.literal("RESET BOTH DATABASES") }).strict(),
   z.object({ action: z.literal("insert"), target: targetSchema, count: z.union([z.literal(100), z.literal(1000), z.literal(100000)]), seed: z.number().int().min(0).max(4294967295) }).strict(),

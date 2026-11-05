@@ -4,7 +4,7 @@ import { connect } from "../src/connections";
 import { PostgresStore } from "../src/postgres";
 import { MongoStore } from "../src/mongo";
 import { BenchmarkService } from "../src/benchmark";
-import { benchmarkQueries, filterDate, deleteDate, reviewedNotes } from "../src/benchmark-catalog";
+import { benchmarkQueries, filterDate, deleteDate, reviewedNotes } from "../src/benchmark-queries";
 import { createHandler } from "../src/api";
 import { entities } from "../src/model";
 import { runCustomQuery } from "../src/custom-queries";

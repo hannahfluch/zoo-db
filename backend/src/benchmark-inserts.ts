@@ -1,5 +1,5 @@
 import { batchIds, generateBatch, insertMongo, insertPostgres } from "./benchmark-data";
-import type { Database } from "./benchmark-catalog";
+import type { Database } from "./benchmark-queries";
 import type { BenchmarkStores } from "./benchmark-queries";
 
 export async function runInsertBenchmark(stores: BenchmarkStores, database: Database, count: number, seed: number, run: string) {

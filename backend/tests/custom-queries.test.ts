@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { parseMongoQuery, validateSql } from "../src/custom-queries";
-import { benchmarkQueries } from "../src/benchmark-catalog";
+import { benchmarkQueries } from "../src/benchmark-queries";
 
 describe("Editable MongoDB expressions", () => {
   test("parses all seven presets with their native values", () => {

@@ -1,7 +1,7 @@
 import { parse } from "acorn";
 import { ObjectId } from "mongodb";
 import { entities, HttpError, type Entity } from "./model";
-import type { Database } from "./benchmark-catalog";
+import type { Database } from "./benchmark-queries";
 import type { BenchmarkStores } from "./benchmark-queries";
 
 function invalid(message: string): never { throw new HttpError(400, message); }
