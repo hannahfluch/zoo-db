@@ -1,11 +1,14 @@
 import { ZodError } from "zod";
 import { entities, HttpError, parseList, schemas, type Entity, type Store } from "./model";
+import type { BenchmarkService } from "./benchmark";
 
-export function createHandler(stores: { postgres: Store; mongo: Store }) {
+export function createHandler(stores: { postgres: Store; mongo: Store }, benchmark?: BenchmarkService) {
   return async (request: Request): Promise<Response> => {
     const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
     try {
       const url = new URL(request.url);
+      if (url.pathname.startsWith("/api/benchmark/") && benchmark) return await benchmark.handle(request);
+      if (request.method !== "GET" && benchmark?.busy) throw new HttpError(409, "A test operation is running. Wait before changing data.");
       if (url.pathname === "/api/health" && request.method === "GET") {
         const results = await Promise.allSettled([stores.postgres.ping(), stores.mongo.ping()]);
         return reply({ postgres: results[0].status === "fulfilled", mongo: results[1].status === "fulfilled" }, results.every(r => r.status === "fulfilled") ? 200 : 503);

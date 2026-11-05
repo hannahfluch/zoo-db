@@ -2,6 +2,9 @@
 
 The backend is independent of the frontends. Base URL: `http://localhost:3000/api`.
 The data frontend accesses it through its own nginx proxy at `/api`.
+
+The separate test frontend uses the [benchmark API](benchmark.md#api) for resets,
+bulk generation, query timing, index controls, and k6 suites.
 This is a local development API without application-user authentication.
 
 Replace `{database}` with `postgres` or `mongo`, and `{entity}` with `animals`,

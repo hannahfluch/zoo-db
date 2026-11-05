@@ -77,6 +77,19 @@ services:
       timeout: 5s
       retries: 10
 
+  benchmark:
+    build: ./frontends/benchmark
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${BENCHMARK_PORT:-8081}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   zoo_data:
   zoo_mongo_data:

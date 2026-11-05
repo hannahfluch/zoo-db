@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zoo test / benchmark</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main>
+    <header><h1>Test / benchmark</h1><button id="refresh">Refresh</button></header>
+    <div id="error" role="alert" hidden></div>
+    <section class="panel"><h2>Databases</h2><div id="state" role="status">Loading…</div></section>
+    <div class="controls">
+      <section class="panel">
+        <h2>Random data</h2>
+        <form id="insert-form">
+          <label>Database<select name="target"><option value="both">Both · same generated batch</option><option value="postgres">PostgreSQL</option><option value="mongo">MongoDB</option></select></label>
+          <label>Records per table / collection<select name="count"><option>100</option><option selected>1000</option><option>100000</option></select></label>
+          <label>Random seed<input name="seed" type="number" value="42" min="0" max="4294967295" required></label>
+          <p class="muted">Adds N records to each of the four entities (4 × N per database). Related records and embedded views are generated together.</p>
+          <button class="primary" type="submit" data-action>Insert random records</button>
+        </form>
+      </section>
+      <section class="panel">
+        <h2>Indexes and reset</h2>
+        <label>Database<select id="index-target"><option value="both">Both databases</option><option value="postgres">PostgreSQL</option><option value="mongo">MongoDB</option></select></label>
+        <div class="actions"><button id="indexes-on" data-action>Enable benchmark index</button><button id="indexes-off" data-action>Remove benchmark index</button></div>
+        <p class="muted">The optional index covers examination date and ID. Primary-key and uniqueness indexes always remain.</p>
+        <hr>
+        <p>Reset clears all four entities in both databases and resets PostgreSQL IDs. Current index settings are preserved.</p>
+        <button id="reset" class="danger" data-action>Reset both databases</button>
+      </section>
+      <section class="panel">
+        <h2>k6 benchmark suite</h2>
+        <form id="suite-form">
+          <label>Database<select name="target"><option value="both">Both databases</option><option value="postgres">PostgreSQL</option><option value="mongo">MongoDB</option></select></label>
+          <label>Workload<select name="workload"><option value="all">Inserts and all seven queries</option><option value="inserts">Inserts only</option><option value="queries">Queries only</option></select></label>
+          <div class="pair"><label>Insert records per entity<select name="insertCount"><option>100</option><option selected>1000</option><option>100000</option></select></label><label>Insert random seed<input name="seed" type="number" min="0" max="4294967295" value="42" required></label></div>
+          <label>Benchmark index<select name="indexes"><option value="both">Compare without / with index</option><option value="off">Without index</option><option value="on">With index</option></select></label>
+          <div class="pair"><label>Iterations<input name="iterations" type="number" min="1" max="100" value="5" required></label><label>Virtual users<input name="vus" type="number" min="1" max="20" value="1" required></label></div>
+          <p class="muted">Each iteration runs the selected workload per database. An insert writes N records to each of the four entities. Inserts and other writes roll back; initial index settings are restored. Each index mode starts with a warm-up pass.</p>
+          <button class="primary" type="submit" data-action>Run k6 benchmark</button>
+          <p id="k6-status" class="muted"></p>
+        </form>
+      </section>
+    </div>
+    <section class="panel" id="job-panel" hidden aria-live="polite"><h2 id="job-title">Operation</h2><p id="job-progress"></p><div id="job-result"></div></section>
+    <section class="panel" id="custom-query-section">
+      <div class="section-header"><h2>Custom queries</h2><div class="actions"><select id="custom-preset" aria-label="Preset to load"><option value="">Choose a preset…</option></select><button id="load-custom-preset" data-action>Load into editors</button></div></div>
+      <p class="muted">Edit and run SQL or MongoDB collection expressions. Runs record runtime and show up to 25 result rows/documents. Raw writes go directly to the database; kept MongoDB writes bypass embedded-copy maintenance.</p>
+      <div class="section-header"><label class="inline">Transaction<select id="custom-commit-mode"><option value="rollback">Roll back after running</option><option value="commit">Keep changes</option></select></label><button id="run-custom-both" class="primary" data-action>Run both editors</button></div>
+      <div class="code-pair">
+        <div><div class="section-header"><label for="custom-sql">PostgreSQL · SQL</label><button id="run-custom-postgres" data-action>Run PostgreSQL</button></div><textarea id="custom-sql" class="query-editor" rows="12" maxlength="20000" spellcheck="false"></textarea><p class="muted">One SELECT, WITH, INSERT, UPDATE, DELETE or EXPLAIN statement. Ctrl+Enter to run.</p></div>
+        <div><div class="section-header"><label for="custom-mongo">MongoDB</label><button id="run-custom-mongo" data-action>Run MongoDB</button></div><textarea id="custom-mongo" class="query-editor" rows="12" maxlength="20000" spellcheck="false"></textarea><p class="muted">Collection expressions with literal values, ISODate, ObjectId, and cursor methods. Ctrl+Enter to run.</p></div>
+      </div>
+    </section>
+    <section>
+      <div class="section-header"><h2>Preset queries</h2><label class="inline">Individual writes<select id="commit-mode"><option value="rollback">Roll back after measuring</option><option value="commit">Keep changes</option></select></label></div>
+      <p class="muted">Paired presets operate on the same checkups and use equivalent date filters, projections and ordering. Finds consume the full result; previews show at most 25 rows/documents. Compare databases using a shared generated batch.</p>
+      <div id="queries"></div>
+    </section>
+    <section class="panel"><div class="section-header"><h2>Recorded runs</h2><button id="download">Download JSON</button></div><p class="muted">The latest 50 runs are kept while the backend is running. Export results to keep them.</p><div id="history"></div></section>
+  </main>
+</body>
+</html>

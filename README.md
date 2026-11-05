@@ -62,6 +62,11 @@ After startup, open **http://localhost:8080**. The API is available at
 `http://localhost:3000/api`. Startup can take a minute; inspect readiness with
 `docker compose ps` or `curl http://localhost:3000/api/health`.
 
+The separate **test / benchmark frontend** is at **http://localhost:8081**. It
+resets both databases, inserts 100 / 1,000 / 100,000 random records per entity,
+runs seven equivalent SQL/MongoDB query pairs, and uses k6 to benchmark inserts
+and queries with and without a benchmark index. See [benchmark usage and timings](docs/benchmark.md).
+
 The data frontend provides lists, record counts, literal case-insensitive search,
 pagination, linked detail pages, complete related histories, and create/edit forms
 for all four entities, with delete actions on detail pages. The database selector changes where reads and writes go;
@@ -93,13 +98,14 @@ docker compose logs mongo
 ```text
 backend/              Shared REST API, database adapters, validation, tests
 frontends/data/       Independent HTML/CSS/JS data frontend, served by nginx
+frontends/benchmark/  Independent test and benchmark frontend, served by nginx
 mongo/                MongoDB image with persistent replica-set key
 sql/                  PostgreSQL schema and initial data
 ```
 
-A second frontend belongs in another directory under `frontends/`, with its own
-build and service. It can use the API described in [docs/api.md](docs/api.md)
-without importing or changing the data frontend. The data frontend nginx service proxies
+Both frontends have their own directory, image, and Compose service. They share
+the backend described in [docs/api.md](docs/api.md) without importing each other's
+code. The data frontend nginx service proxies
 `/api/` to the backend, keeping browser requests on the same origin. Another
 frontend should configure a similar proxy; the API does not enable cross-origin
 browser access by default. The backend does not serve frontend files.
@@ -162,7 +168,8 @@ docker compose exec mongo sh -c 'exec mongosh zoo --username "$MONGO_INITDB_ROOT
 
 The backend creates the four MongoDB collections at startup, with unique indexes
 only for enclosure names and employee emails. No extra relationship or search
-indexes are created. PostgreSQL keeps its primary-key and UNIQUE constraints.
+indexes are created at startup. The benchmark frontend can explicitly toggle its
+optional date index. PostgreSQL keeps its primary-key and UNIQUE constraints.
 MongoDB runs as a single-node replica set; the backend initializes it on the first start.
 Its internal authentication key is stored in the `zoo_mongo_config` volume.
 Creates, edits, and deletes update MongoDB records and their embedded views in

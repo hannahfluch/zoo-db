@@ -2,16 +2,17 @@
 
 This document specifies the MongoDB persistence variant implemented in
 `backend/src/mongo.ts`. The backend supports reads, creation, editing, and deletion, including atomic
-embedded updates. Scalable benchmark seeding remains future work.
+embedded updates. The benchmark frontend provides scalable bulk generation.
 
 Keep the four collections `enclosures`, `employees`, `animals`, and `checkups`.
 Each holds the authoritative records for its entity. Embed related summaries to
 let the frontend render detail pages without joining collections. Embedded IDs
 identify the source records; the other embedded fields are duplicated data.
 
-Only MongoDB's required `_id` index and unique indexes on enclosure `name` and
-employee `email` are used. The backend does not create extra relationship,
-sorting, or search indexes.
+Normal application startup uses MongoDB's required `_id` index and unique indexes
+on enclosure `name` and employee `email`. The backend does not create extra relationship,
+sorting, or search indexes at startup. The benchmark frontend can explicitly
+enable its optional checkup date index for timed comparisons.
 
 The examples use string IDs and ISO date strings as a JSON file format. An
 implementation must use the same ID representation throughout and convert
@@ -182,11 +183,11 @@ also be checked by the persistence layer.
 
 ## Scalable seed and write tests
 
-A future generator should accept a test-case count from 10 to 100,000, create
-valid related records, and derive every embedded view from the same source data.
-Store each entity once in its authoritative collection and copy summaries into
-the appropriate views. Seed output can use four JSON files named after the
-collections, each containing an array of documents.
+The [benchmark frontend](benchmark.md) generates 100, 1,000, or 100,000 records per
+entity and derives all embedded views from that batch. Selecting both databases
+uses the same generated attributes, relationships, and IDs. Each entity is stored
+once in its authoritative collection with summaries copied into the appropriate
+views. Batches append; the reset action clears both databases.
 
 For benchmark reporting, distinguish a logical operation (for example, creating
 one checkup) from its database writes (the checkup insert and updates to two
