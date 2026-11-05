@@ -138,6 +138,71 @@ describe.skipIf(process.env.RUN_INTEGRATION !== "1")("Both persistence adapters"
     }
     expect((await put("enclosures", "missing", area)).status).toBe(404);
   }, 90000);
+  test("mongo: embedded children follow creation, edits, reparenting and deletion", async () => {
+    const request = async (path: string, body?: any, method = body ? "POST" : "GET") => {
+      const response = await handle(new Request(`http://api/api/mongo/${path}`, { method, ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}) }));
+      return { status: response.status, data: await response.json() };
+    };
+    const home = await mongo.create("enclosures", { name: "Children home", habitatType: "Savannah", areaSqm: 200 });
+    const input = { name: "Parent A", birthDate: "2020-01-01", enclosureId: home.id, parentId: null };
+    const make = async (body: any) => { const result = await request("animals", body); expect(result.status).toBe(201); return result.data; };
+    const put = async (id: string, body: any) => { const result = await request(`animals/${id}`, body, "PUT"); expect(result.status).toBe(200); return result.data; };
+    const children = async (id: string) => (await mongo.collection("animals").findOne({ _id: id }))!.children;
+    const parentA = await make(input);
+    const parentB = await make({ ...input, name: "Parent B" });
+    expect(parentA.children).toEqual([]);
+    const [child, sibling] = await Promise.all([
+      make({ ...input, name: "Child", parentId: parentA.id }),
+      make({ ...input, name: "Sibling", parentId: parentA.id }),
+    ]);
+    const grandchild = await make({ ...input, name: "Grandchild", parentId: child.id });
+    expect((await children(parentA.id)).map((c: any) => c.id).sort()).toEqual([child.id, sibling.id].sort());
+    expect(await children(child.id)).toEqual([{ id: grandchild.id, name: "Grandchild", birthDate: input.birthDate }]);
+    // Embedded summaries must not recursively contain a child's own children.
+    expect((await children(parentA.id)).find((c: any) => c.id === child.id)).toEqual({ id: child.id, name: "Child", birthDate: input.birthDate });
+    const edited = { ...input, name: "Renamed child", birthDate: "2021-02-03", parentId: parentA.id };
+    await put(child.id, edited);
+    await put(child.id, edited);
+    expect((await children(parentA.id)).filter((c: any) => c.id === child.id)).toEqual([{ id: child.id, name: edited.name, birthDate: edited.birthDate }]);
+    expect((await mongo.get("animals", grandchild.id))!.parent.name).toBe(edited.name);
+    expect((await request(`animals/${child.id}`, { ...edited, parentId: "missing" }, "PUT")).status).toBe(400);
+    expect((await children(parentA.id))).toHaveLength(2);
+    expect((await request(`animals/${child.id}`, { ...edited, children: [] }, "PUT")).status).toBe(400);
+    await put(child.id, { ...edited, parentId: parentB.id });
+    expect((await children(parentA.id)).map((c: any) => c.id)).toEqual([sibling.id]);
+    expect((await children(parentB.id)).map((c: any) => c.id)).toEqual([child.id]);
+    expect((await request(`animals/${parentB.id}`)).data.record.children[0].name).toBe(edited.name);
+    await put(child.id, { ...edited, parentId: null });
+    expect(await children(parentB.id)).toEqual([]);
+    await put(child.id, edited);
+    expect((await request(`animals/${child.id}`, undefined, "DELETE")).status).toBe(200);
+    expect((await children(parentA.id)).map((c: any) => c.id)).toEqual([sibling.id]);
+    expect((await mongo.get("animals", grandchild.id))!.parent).toBeNull();
+    expect(await children(grandchild.id)).toEqual([]);
+    expect((await request(`animals/${parentA.id}`, undefined, "DELETE")).status).toBe(200);
+    expect((await mongo.get("animals", sibling.id))!.parent).toBeNull();
+  });
+  test("mongo: PostgreSQL import embeds direct children", async () => {
+    const postgres = new PostgresStore(pool);
+    const home = await postgres.create("enclosures", { name: "Seed children home", habitatType: "Savannah", areaSqm: 200 });
+    const input = { name: "Seed child", birthDate: "2020-01-01", enclosureId: home.id, parentId: null };
+    // The parent appears after its child in source ID order.
+    const child = await postgres.create("animals", input);
+    const parent = await postgres.create("animals", { ...input, name: "Seed parent" });
+    await postgres.update("animals", child.id, { ...input, parentId: parent.id });
+    const database = `${namespace}_seed`;
+    try {
+      const process = Bun.spawn(["bun", new URL("../src/seed-mongo.ts", import.meta.url).pathname], {
+        env: { ...Bun.env, PGOPTIONS: `-c search_path=${namespace}`, MONGO_DATABASE: database },
+        stdout: "pipe", stderr: "pipe",
+      });
+      const [, stderr, code] = await Promise.all([new Response(process.stdout).text(), new Response(process.stderr).text(), process.exited]);
+      expect({ code, stderr }).toEqual({ code: 0, stderr: "" });
+      const seeded = new MongoStore(connection.stores.mongo.client, database);
+      expect((await seeded.get("animals", parent.id))!.children).toEqual([{ id: child.id, name: input.name, birthDate: input.birthDate }]);
+      expect((await seeded.get("animals", child.id))!.children).toEqual([]);
+    } finally { await connection.stores.mongo.client.db(database).dropDatabase(); }
+  }, 30000);
   for (const db of ["postgres", "mongo"]) test(`${db}: animal deletion cascades through full history and preserves offspring`, async () => {
     const request = async (path: string, body?: any, method = body ? "POST" : "GET") => {
       const response = await handle(new Request(`http://api/api/${db}/${path}`, { method, ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}) }));

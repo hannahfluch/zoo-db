@@ -58,8 +58,9 @@ export class MongoStore implements Store {
         if (entity === "animals") {
           const enclosure = await this.required("enclosures", input.enclosureId, session);
           const parent = input.parentId ? await this.required("animals", input.parentId, session) : null;
-          doc = { _id: id, name: input.name, birthDate: input.birthDate, enclosure: { id: enclosure._id, name: enclosure.name }, parent: parent ? { id: parent._id, name: parent.name } : null, checkups: [] };
+          doc = { _id: id, name: input.name, birthDate: input.birthDate, enclosure: { id: enclosure._id, name: enclosure.name }, parent: parent ? { id: parent._id, name: parent.name } : null, children: [], checkups: [] };
           await this.collection("enclosures").updateOne({ _id: enclosure._id }, { $push: { animals: { id, name: input.name, birthDate: input.birthDate } } } as any, options);
+          if (parent) await this.collection("animals").updateOne({ _id: parent._id }, { $push: { children: { id, name: input.name, birthDate: input.birthDate } } } as any, options);
         }
         if (entity === "checkups") {
           const animal = await this.required("animals", input.animalId, session);
@@ -123,6 +124,8 @@ export class MongoStore implements Store {
         await this.collection("enclosures").updateOne({ _id: previous.enclosure.id }, { $pull: { animals: { id } } } as any, options);
         await this.collection("enclosures").updateOne({ _id: enclosure._id }, { $push: { animals: { id, name: input.name, birthDate: input.birthDate } } } as any, options);
         await this.collection("animals").updateMany({ "parent.id": id }, { $set: { "parent.name": input.name } }, options);
+        if (previous.parent) await this.collection("animals").updateOne({ _id: previous.parent.id }, { $pull: { children: { id } } } as any, options);
+        if (parent) await this.collection("animals").updateOne({ _id: parent._id }, { $push: { children: { id, name: input.name, birthDate: input.birthDate } } } as any, options);
         const animal = { id, name: input.name };
         await this.collection("checkups").updateMany({ "animal.id": id }, { $set: { animal } }, options);
         await this.collection("employees").updateMany({ "checkups.animal.id": id }, { $set: { "checkups.$[c].animal": animal } }, { ...options, arrayFilters: [{ "c.animal.id": id }] });
@@ -153,6 +156,7 @@ export class MongoStore implements Store {
         const employeeIds = await this.collection("checkups").distinct("employee.id", { "animal.id": id }, options);
         await this.collection("checkups").deleteMany({ "animal.id": id }, options);
         await this.collection("animals").updateMany({ "parent.id": id }, { $set: { parent: null } }, options);
+        if (record.parent) await this.collection("animals").updateOne({ _id: record.parent.id }, { $pull: { children: { id } } } as any, options);
         await this.collection("enclosures").updateOne({ _id: record.enclosure.id }, { $pull: { animals: { id } } } as any, options);
         for (const employeeId of employeeIds) await this.refreshHistory("employees", employeeId, session);
       }

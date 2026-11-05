@@ -20,8 +20,12 @@ try {
   for (const enclosure of docs.enclosures) enclosure.animals = [];
   for (const employee of docs.employees) employee.checkups = [];
   for (const animal of docs.animals) {
+    animal.children = [];
     animal.checkups = [];
     enclosures.get(animal.enclosure.id).animals.push({ id: animal._id, name: animal.name, birthDate: animal.birthDate });
+  }
+  for (const animal of docs.animals) {
+    if (animal.parent) animals.get(animal.parent.id).children.push({ id: animal._id, name: animal.name, birthDate: animal.birthDate });
   }
   docs.checkups.sort((a, b) => new Date(b.checkedAt).getTime() - new Date(a.checkedAt).getTime() || (a._id < b._id ? 1 : a._id > b._id ? -1 : 0));
   for (const checkup of docs.checkups) {

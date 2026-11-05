@@ -110,6 +110,8 @@ within each database. `parentId` is optional and defaults to null. Birth dates u
 `YYYY-MM-DD`; examination timestamps require an ISO timestamp with an offset.
 
 MongoDB creates, edits, and deletes update embedded views transactionally.
+Animal documents include a derived `children` array of direct-child summaries
+(`id`, `name`, `birthDate`), kept in sync through each child's `parentId`.
 Renames propagate to embedded summaries, moving an animal updates both enclosure
 arrays, and reassigning a checkup refreshes both its former and new owners.
 Editing or deleting checkups rebuilds the affected recent-history arrays from the

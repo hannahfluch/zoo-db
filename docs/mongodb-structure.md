@@ -65,7 +65,7 @@ including the animal name for each examination.
 ## Animals
 
 The animal detail page receives animal information, an enclosure summary, an
-optional parent summary, and recent checkups with employee names.
+optional parent summary, direct children, and recent checkups with employee names.
 
 ```json
 {
@@ -74,6 +74,7 @@ optional parent summary, and recent checkups with employee names.
   "birthDate": "2022-06-15",
   "enclosure": { "id": "enclosure-1", "name": "Lion Savannah" },
   "parent": { "id": "animal-1", "name": "Nala" },
+  "children": [],
   "checkups": [
     {
       "id": "checkup-4",
@@ -92,6 +93,18 @@ optional parent summary, and recent checkups with employee names.
 Use `parent: null` when no parent is recorded. Use empty arrays when no related
 records exist. Do not recursively embed parents, enclosures, or complete animal
 and employee documents inside their summaries.
+
+Each `children` entry contains `id`, `name`, and `birthDate`. The array contains
+only direct children and is derived from their recorded `parent`, so it is not
+edited independently. For example:
+
+```json
+{
+  "id": "animal-9",
+  "name": "Asha",
+  "birthDate": "2026-01-10"
+}
+```
 
 ## Checkups
 
@@ -140,6 +153,10 @@ Embedded values represent current data, not historical snapshots.
   animal or employee changes, refresh both the old and new owners.
 - Creating an animal adds its summary to its enclosure. Moving it updates its
   enclosure summary and both enclosures' animal arrays.
+- Creating a child also adds its summary to its parent's `children` array.
+  Editing the child refreshes that summary; changing or clearing its parent
+  removes it from the former parent's array and adds it to the new one if set.
+  Deleting the child removes its summary from its parent's array.
 - Renaming an animal updates its enclosure entry, parent summaries in offspring,
   animal summaries in checkups, and employee checkup arrays containing it.
 - Renaming an employee updates employee summaries in checkups and animal checkup
