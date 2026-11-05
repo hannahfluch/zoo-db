@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { parseMongoQuery, validateSql } from "../src/custom-queries";
-import { benchmarkQueries } from "../src/benchmark-queries";
+import { benchmarkQueries, QueryId } from "../src/benchmark-queries";
 
 describe("Editable MongoDB expressions", () => {
-  test("parses all seven presets with their native values", () => {
-    for (const query of benchmarkQueries) expect(parseMongoQuery(query.mongo).collection).toBe("checkups");
+  test("parses the presets with their native values", () => {
+    for (const query of benchmarkQueries) expect(parseMongoQuery(query.mongo).collection).toBe(query.id === QueryId.UniqueEmail ? "employees" : "checkups");
     const plan = parseMongoQuery('db.checkups.find({ checkedAt: { $gte: ISODate("2026-01-01T00:00:00Z") }, notes: /routine/i }, { notes: 1, _id: 0 }).sort({ checkedAt: -1 }).skip(1).limit(3).toArray()');
     expect(plan.operation.args[0].checkedAt.$gte).toBeInstanceOf(Date);
     expect(plan.operation.args[0].notes).toBeInstanceOf(RegExp);

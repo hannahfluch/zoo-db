@@ -27,7 +27,8 @@ statistics are refreshed after insertion.
 
 ## Queries
 
-The frontend displays seven paired SQL and MongoDB presets from
+The frontend displays seven regular paired SQL and MongoDB presets and one
+schema-violation test from
 `backend/src/benchmark-queries.ts`, each with a run button for either or both
 databases. They operate on checkups:
 
@@ -58,6 +59,18 @@ an update or delete after confirming it. MongoDB updates its embedded animal and
 employee checkups in the same transaction. The delete predicate removes the oldest
 examinations, so removing matching embedded entries preserves the latest remaining
 history without leaving gaps.
+
+## Schema violation test
+
+The additional **Schema violation: duplicate employee email** preset attempts to
+insert two employees with the same email. PostgreSQL rejects it with error code
+`23505`; MongoDB rejects it with `11000`. The frontend shows the actual database
+message and recorded runtime for each database. An expected rejection counts as a
+successful test; accepting the duplicate or another error fails the run.
+
+The preset always rolls back, even with **Keep changes** selected. It works on an
+empty database and leaves no employees behind. It is run individually with the
+preset buttons and is excluded from the regular seven-query k6 workload.
 
 ## Custom query editors
 

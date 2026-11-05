@@ -63,10 +63,13 @@ function renderJob(job) {
     if (operation.queryId) {
       const custom = operation.queryId === 'custom';
       html += `<p>${operation.rows.toLocaleString()} ${custom ? 'rows / documents' : operation.queryId.startsWith('find') ? 'rows / documents returned' : 'rows / documents matched'} · Database: <strong>${ms(operation.databaseMs)}</strong>${custom ? '' : ` · Embedded sync: ${ms(operation.syncMs)}`} · Total: ${ms(operation.totalMs)}</p><p class="muted">${custom ? `Command: ${escape(operation.command)} · Transaction ${operation.committed ? 'committed' : 'rolled back'}.` : operation.committed ? 'Changes committed.' : 'No changes kept.'}${operation.modified !== null ? ` MongoDB modified ${operation.modified} documents.` : ''}${custom ? '' : ` · Benchmark index ${operation.indexEnabled ? 'on' : 'off'}`}</p>`;
+      if (operation.expectedError) html += `<p><strong>Rejected as expected (${escape(operation.expectedError.code)})</strong></p><pre>${escape(operation.expectedError.message)}</pre>`;
       if (custom) html += `<details><summary>Executed query</summary><pre>${escape(result.request[operation.database === 'postgres' ? 'sql' : 'mongo'])}</pre></details>`;
       if (operation.preview.length) html += `<details><summary>Result preview (${operation.preview.length})</summary><pre>${escape(JSON.stringify(operation.preview, null, 2))}</pre></details>`;
       const cell = document.querySelector(`[data-result="${operation.queryId}-${operation.database}"]`);
-      if (cell) cell.textContent = `${ms(operation.databaseMs)} database · ${ms(operation.totalMs)} total · ${operation.rows.toLocaleString()} rows`;
+      if (cell) cell.textContent = operation.expectedError
+        ? `Rejected as expected (${operation.expectedError.code}) · ${ms(operation.databaseMs)} database · ${ms(operation.totalMs)} total`
+        : `${ms(operation.databaseMs)} database · ${ms(operation.totalMs)} total · ${operation.rows.toLocaleString()} rows`;
     } else html += `<p><strong>${ms(operation.durationMs)}</strong>${operation.totalRecords ? ` · ${operation.recordsPerEntity.toLocaleString()} per entity / ${operation.totalRecords.toLocaleString()} total records` : ''}${operation.enabled !== undefined ? ` · Benchmark index ${operation.enabled ? 'enabled' : 'disabled'}` : ''}</p>`;
     html += '</div>';
   }
@@ -128,7 +131,7 @@ function renderQueries() {
   document.querySelector('#queries').innerHTML = queries.map(query => `<article class="panel query"><div class="section-header"><h3>${escape(query.title)}</h3><button data-both="${query.id}" data-action>Run both</button></div><div class="code-pair">${Object.keys(names).map(database => `<div><div class="section-header"><strong>${names[database]}</strong><button data-query="${query.id}" data-db="${database}" data-action>Run</button></div><pre><code>${escape(database === 'postgres' ? query.sql : query.mongo)}</code></pre><p class="muted" data-result="${query.id}-${database}">Not run yet.</p></div>`).join('')}</div></article>`).join('');
   const run = (target, queryId) => {
     const commit = document.querySelector('#commit-mode').value === 'commit';
-    if (commit && queries.find(query => query.id === queryId).kind !== 'find' && !window.confirm(`Apply this ${queryId} operation to ${target === 'both' ? 'both databases' : names[target]}? Changes will be kept.`)) return;
+    if (commit && ['update', 'delete'].includes(queries.find(query => query.id === queryId).kind) && !window.confirm(`Apply this ${queryId} operation to ${target === 'both' ? 'both databases' : names[target]}? Changes will be kept.`)) return;
     start({ action: 'query', target, queryId, commit });
   };
   document.querySelectorAll('[data-query]').forEach(button => button.onclick = () => run(button.dataset.db, button.dataset.query));

@@ -15,6 +15,7 @@ export enum QueryId {
   UpdateFilter = "update-filter",
   UpdateAll = "update-all",
   DeleteFilter = "delete-filter",
+  UniqueEmail = "unique-email",
 }
 
 export const filterDate = "2026-01-01T00:00:00Z";
@@ -87,6 +88,23 @@ db.checkups.updateMany(
     sql: `DELETE FROM checkups WHERE checked_at < '${deleteDate}';`,
     mongo: `db.checkups.deleteMany({ checkedAt: { $lt: ISODate("${deleteDate}") } })`,
   },
+  {
+    id: QueryId.UniqueEmail,
+    title: "Schema violation: duplicate employee email",
+    kind: "constraint",
+    sql: `
+INSERT INTO employees (first_name, last_name, job_title, email)
+VALUES
+  ('Schema', 'Test A', 'Keeper', 'schema-test@example.com'),
+  ('Schema', 'Test B', 'Keeper', 'schema-test@example.com');
+`.trim(),
+    mongo: `
+db.employees.insertMany([
+  { firstName: "Schema", lastName: "Test A", jobTitle: "Keeper", email: "schema-test@example.com", checkups: [] },
+  { firstName: "Schema", lastName: "Test B", jobTitle: "Keeper", email: "schema-test@example.com", checkups: [] }
+])
+`.trim(),
+  },
 ] as const;
 
 export interface QueryResult extends QueryRows {
@@ -96,6 +114,7 @@ export interface QueryResult extends QueryRows {
   syncMs: number;
   totalMs: number;
   committed: boolean;
+  expectedError?: { code: string; message: string };
 }
 
 class RolledBack extends Error {
@@ -128,6 +147,10 @@ export async function runQuery(
 ): Promise<QueryResult> {
   const query = benchmarkQueries.find(query => query.id === queryId)!;
   const started = performance.now();
+  const constraintTest = queryId === QueryId.UniqueEmail;
+  if (constraintTest) commit = false;
+  let expectedError: QueryResult["expectedError"];
+  let queryStarted = started;
   let databaseMs = 0;
   let syncMs = 0;
   let result: QueryRows = { rows: 0, modified: null, preview: [] };
@@ -138,9 +161,10 @@ export async function runQuery(
       await client.query("BEGIN");
       await client.query("SET LOCAL statement_timeout = '120s'");
 
-      const queryStarted = performance.now();
+      queryStarted = performance.now();
       const response = await client.query(query.sql);
       databaseMs = performance.now() - queryStarted;
+      if (constraintTest) throw new Error("The database accepted duplicate employee emails.");
       result = {
         rows: response.rowCount ?? 0,
         modified: null,
@@ -149,8 +173,13 @@ export async function runQuery(
 
       await client.query(commit && query.kind !== "find" ? "COMMIT" : "ROLLBACK");
     } catch (error) {
+      databaseMs = performance.now() - queryStarted;
       await client.query("ROLLBACK");
-      throw error;
+      if (constraintTest && (error as { code?: string }).code === "23505") {
+        expectedError = { code: "23505", message: (error as Error).message };
+      } else {
+        throw error;
+      }
     } finally {
       client.release();
     }
@@ -159,7 +188,7 @@ export async function runQuery(
     try {
       try {
         await session.withTransaction(async () => {
-          const queryStarted = performance.now();
+          queryStarted = performance.now();
           const checkups = stores.mongo.collection("checkups");
           const options = { session, maxTimeMS: 120000 };
           switch (queryId) {
@@ -209,6 +238,17 @@ export async function runQuery(
               result = { rows: response.matchedCount, modified: response.modifiedCount, preview: [] };
               break;
             }
+            case QueryId.UniqueEmail: {
+              try {
+                await stores.mongo.db.collection("employees").insertMany([
+                  { firstName: "Schema", lastName: "Test A", jobTitle: "Keeper", email: "schema-test@example.com", checkups: [] },
+                  { firstName: "Schema", lastName: "Test B", jobTitle: "Keeper", email: "schema-test@example.com", checkups: [] },
+                ], { session });
+              } finally {
+                databaseMs = performance.now() - queryStarted;
+              }
+              throw new Error("The database accepted duplicate employee emails.");
+            }
             case QueryId.DeleteFilter: {
               const response = await checkups.deleteMany(
                 { checkedAt: { $lt: new Date(deleteDate) } },
@@ -255,7 +295,11 @@ export async function runQuery(
           }
         });
       } catch (error) {
-        if (!(error instanceof RolledBack)) throw error;
+        if (constraintTest && (error as { code?: number }).code === 11000) {
+          expectedError = { code: "11000", message: (error as Error).message };
+        } else if (!(error instanceof RolledBack)) {
+          throw error;
+        }
       }
     } finally {
       await session.endSession();
@@ -266,6 +310,7 @@ export async function runQuery(
     database,
     queryId,
     ...result,
+    expectedError,
     databaseMs,
     syncMs,
     totalMs: performance.now() - started,

@@ -4,7 +4,7 @@ import { connect } from "../src/connections";
 import { PostgresStore } from "../src/postgres";
 import { MongoStore } from "../src/mongo";
 import { BenchmarkService } from "../src/benchmark";
-import { benchmarkQueries, filterDate, deleteDate, reviewedNotes } from "../src/benchmark-queries";
+import { benchmarkQueries, filterDate, deleteDate, reviewedNotes, QueryId } from "../src/benchmark-queries";
 import { createHandler } from "../src/api";
 import { entities } from "../src/model";
 import { runCustomQuery } from "../src/custom-queries";
@@ -80,7 +80,7 @@ describe.skipIf(process.env.RUN_INTEGRATION !== "1")("Benchmark frontend API", (
     const pgIds = (await pool.query("SELECT checkup_id::text AS id FROM checkups ORDER BY checkup_id")).rows.map(r => r.id).sort();
     expect((await mongo.collection("checkups").distinct("_id")).sort()).toEqual(pgIds);
   });
-  test("all seven query pairs agree; rollback leaves records and embedded views unchanged", async () => {
+  test("query pairs agree; rollback leaves records and embedded views unchanged", async () => {
     const original = await mongo.collection("checkups").find({}).sort({ _id: 1 }).toArray();
     const embedded = await mongo.collection("animals").find({}).sort({ _id: 1 }).toArray();
     for (const query of benchmarkQueries) {
@@ -89,6 +89,14 @@ describe.skipIf(process.env.RUN_INTEGRATION !== "1")("Benchmark frontend API", (
       expect(postgres.rows).toBe(mongo.rows);
       expect(postgres.committed).toBe(false);
       expect(mongo.committed).toBe(false);
+      if (query.id === QueryId.UniqueEmail) {
+        expect(postgres.expectedError.code).toBe("23505");
+        expect(mongo.expectedError.code).toBe("11000");
+        expect(postgres.expectedError.message).toContain("email");
+        expect(mongo.expectedError.message).toContain("email");
+        expect((await state()).counts.postgres.employees).toBe(100);
+        expect((await state()).counts.mongo.employees).toBe(100);
+      }
       if (query.id === "find-sort") expect(JSON.parse(JSON.stringify(postgres.preview))).toEqual(JSON.parse(JSON.stringify(mongo.preview)));
       for (const operation of result.operations) expect(operation.databaseMs).toBeGreaterThanOrEqual(0);
     }
@@ -126,6 +134,10 @@ describe.skipIf(process.env.RUN_INTEGRATION !== "1")("Benchmark frontend API", (
     const empty = await state();
     for (const database of ["postgres", "mongo"]) for (const entity of entities) expect(empty.counts[database][entity]).toBe(0);
     expect(empty.indexes).toEqual({ postgres: true, mongo: true });
+    const rejected = await job({ action: "query", target: "both", queryId: QueryId.UniqueEmail, commit: true });
+    expect(rejected.operations.map((operation: any) => operation.expectedError.code)).toEqual(["23505", "11000"]);
+    expect(rejected.operations.every((operation: any) => operation.committed === false)).toBe(true);
+    expect((await state()).counts).toEqual(empty.counts);
     await job({ action: "insert", target: "both", count: 1000, seed: 42 });
     expect((await pool.query("SELECT min(animal_id) FROM animals")).rows[0].min).toBe(1);
     await job({ action: "insert", target: "both", count: 100, seed: 42 });

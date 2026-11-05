@@ -117,7 +117,7 @@ export class BenchmarkService {
   private async analyze() { for (const entity of entities) await this.stores.postgres.pool.query(`ANALYZE ${entity}`); }
   private async suite(job: Job, input: Extract<z.infer<typeof actionSchema>, { action: "suite" }>, progress: (stage: string) => void) {
     const targets = databases(input.target);
-    const operations = input.workload === "inserts" ? ["insert"] : [...(input.workload === "all" ? ["insert"] : []), ...benchmarkQueries.map(query => query.id)];
+    const operations = input.workload === "inserts" ? ["insert"] : [...(input.workload === "all" ? ["insert"] : []), ...benchmarkQueries.filter(query => query.kind !== "constraint").map(query => query.id)];
     const original = { postgres: await this.indexState("postgres"), mongo: await this.indexState("mongo") };
     job.result.phases = [];
     job.result.originalIndexes = original;
